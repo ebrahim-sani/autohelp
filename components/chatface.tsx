@@ -1,9 +1,8 @@
 "use client";
-import { CornerDownLeft, Mic, Paperclip } from "lucide-react";
 
+import { CornerDownLeft, Mic, Paperclip } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
 import { Textarea } from "@/components/ui/textarea";
 import {
    Tooltip,
@@ -14,38 +13,35 @@ import {
 import { Label } from "@/components/ui/label";
 import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "./ui/scroll-area";
+import { config } from "@/lib/config";
+import MarkdownRenderer from "@/lib/markdownRenderer";
 
 function ChatFace() {
    const [inputValue, setInputValue] = useState("");
-   const [messages, setMessages] = useState([
-      { sender: "AI", content: "Hello! How can I assist you today?" },
-      { sender: "User", content: "Hi! I have a question about React hooks." },
-      {
-         sender: "AI",
-         content:
-            "Sure, I'd be happy to help. What specific question do you have about React hooks?",
-      },
-      { sender: "User", content: "Can you explain the useEffect hook?" },
-      {
-         sender: "AI",
-         content:
-            "The useEffect hook in React is used for side effects in function components. It serves a similar purpose to componentDidMount, componentDidUpdate, and componentWillUnmount in class components, but unified into a single API.",
-      },
-      {
-         sender: "User",
-         content: "That's helpful, thanks! Can you give an example?",
-      },
-      {
-         sender: "AI",
-         content:
-            "Of course! Here's a simple example of useEffect:\n\n```jsx\nimport React, { useState, useEffect } from 'react';\n\nfunction Example() {\n  const [count, setCount] = useState(0);\n\n  useEffect(() => {\n    document.title = `You clicked ${count} times`;\n  });\n\n  return (\n    <div>\n      <p>You clicked {count} times</p>\n      <button onClick={() => setCount(count + 1)}>\n        Click me\n      </button>\n    </div>\n  );\n}\n```\n\nIn this example, useEffect updates the document title every time the component renders, including after the count state changes.",
-      },
+   const [messages, setMessages] = useState<any[]>([
+      // { sender: "User", content: "Hello!" },
+      // { sender: "AI", content: "Hello! How can I assist you today?" },
+      // { sender: "User", content: "my car is not starting." },
+      // {
+      //    sender: "AI",
+      //    content:
+      //       "I'm sorry to hear that your car isn't starting. Here are few things to check that could help troubleshoot?",
+      // },
+      // { sender: "User", content: "Can you explain the useEffect hook?" },
+      // {
+      //    sender: "AI",
+      //    content:
+      //       "The useEffect hook in React is used for side effects in function components. It serves a similar purpose to componentDidMount, componentDidUpdate, and componentWillUnmount in class components, but unified into a single API.",
+      // },
+      // {
+      //    sender: "User",
+      //    content: "That's helpful, thanks! Can you give an example?",
+      // },
    ]);
 
-   const chatEndRef = useRef(null);
+   const chatEndRef = useRef<HTMLDivElement>(null);
 
    useEffect(() => {
-      //@ts-ignore
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
    }, [messages]);
 
@@ -55,23 +51,40 @@ function ChatFace() {
       setInputValue(event.target.value);
    };
 
-   const handleSubmit = (event: React.FormEvent) => {
+   const handleSubmit = async (event: React.FormEvent) => {
       event.preventDefault();
       if (inputValue.trim() !== "") {
-         const newMessage = { sender: "User", content: inputValue.trim() };
-         setMessages([...messages, newMessage]);
+         const userMessage = { sender: "User", content: inputValue.trim() };
+         setMessages((prevMessages) => [...prevMessages, userMessage]);
          setInputValue("");
-         // Here you would typically send the message to your AI backend
-         // and then add the AI's response to the messages
+
+         try {
+            const res = await fetch("/api/chat", {
+               method: "POST",
+               headers: {
+                  "Content-Type": "application/json",
+               },
+               body: JSON.stringify({ message: userMessage.content }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+               const aiMessage = { sender: "AI", content: data.response };
+               setMessages((prevMessages) => [...prevMessages, aiMessage]);
+            } else {
+               console.error("Error from API:", data);
+            }
+         } catch (error) {
+            console.error("Error sending message:", error);
+         }
       }
    };
 
    return (
       <>
-         <div className="relative flex h-[70vh] 2xl:h-[86vh] flex-col rounded-xl bg-muted/50 p-4 items-center md:w-2/3">
-            <Badge variant="outline" className="absolute right-3 top-3">
+         <div className="relative flex h-[70vh] 2xl:h-[86vh] flex-col rounded-xl bg-muted/50 p-4 items-center md:w-2/5">
+            {/* <Badge variant="outline" className="absolute right-3 top-3">
                Output
-            </Badge>
+            </Badge> */}
 
             <div className="flex flex-1 h-full w-full space-y-4">
                <ScrollArea className="flex-auto w-full h-[90%] mb-4 pr-4">
@@ -91,7 +104,13 @@ function ChatFace() {
                                  : "bg-pink-200 text-secondary-foreground"
                            }`}
                         >
-                           <p className="text-sm">{message.content}</p>
+                           <p className="text-sm">
+                              {message.sender === "AI" ? (
+                                 <MarkdownRenderer markdown={message.content} />
+                              ) : (
+                                 <p> {message.content}</p>
+                              )}
+                           </p>
                         </div>
                      </div>
                   ))}
